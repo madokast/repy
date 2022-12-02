@@ -283,7 +283,12 @@ def rm(file:str):
 
 # 返回是否设置值、是否交替
 def _set_judge_value(rid, yCol, ruleId, rule, value, label_dirty_table:pd.DataFrame, validation_table:pd.DataFrame,
-        start:int=0, end:int=None, override_to_true:bool=False, override_to_false:bool=False, record = sys.stdout)->Tuple[bool, bool]:
+        start:int=0, end:int=None, override_to_true:bool=False, override_to_false:bool=False, record = None)->Tuple[bool, bool]:
+    if record == None:
+        class NullIO:
+            def write(self, *args, **kwargs):
+                pass
+        record = NullIO()
     if rid < start or (end is not None and rid >= end):
         return False, False
     is_true = (value == TRUE)
@@ -469,7 +474,7 @@ def regex_rule_execute(regex_rules:List[str], label_dirty_table:pd.DataFrame, va
         regular_info = regex_rule[regex_rule.index('^')+2:regex_rule.index('->')].strip()
         column = regular_info[regular_info.index('t0')+3:regular_info.index(',')].strip()
         regex_str = regular_info[regular_info.index('\'')+1:-2]
-        print(f"正则规则 {regex_rule} 提取列名 {column} 正则 {regex_str}")
+        # print(f"正则规则 {regex_rule} 提取列名 {column} 正则 {regex_str}")
         return column, regex_str
 
     import re
@@ -480,7 +485,7 @@ def regex_rule_execute(regex_rules:List[str], label_dirty_table:pd.DataFrame, va
             target = ERROR if p.match(cell_value) is None else TRUE
             _set_judge_value(rid, column, ruleId, regex_rule, target, label_dirty_table, validation_table, start, end, override_to_true, override_to_false)
 
-    for i in range(len(regex_rules)):
+    for i in tqdm(range(len(regex_rules))):
         rule = regex_rules[i]
         column, regex_str = extract_regex_str(rule)
         execute(i, rule, regex_str, column)
@@ -488,10 +493,11 @@ def regex_rule_execute(regex_rules:List[str], label_dirty_table:pd.DataFrame, va
     return label_dirty_table
     
 
+
 if __name__ == '__main__':
     id_column = 'index'
-    clean = load_csv("data/tax/clean.csv")
-    dirty = load_csv("data/tax/dirty.csv")
+    clean = load_csv("data/beers/clean.csv")
+    dirty = load_csv("data/beers/dirty.csv")
     print(clean)
     print(dirty)
 
@@ -500,17 +506,14 @@ if __name__ == '__main__':
     print(validation)
 
     rees = [
-        "tax(t0) ^ t0.child_exemp = '300' ^ t0.has_child = 'N' -> t0._has_child = '0'",
-        "tax(t0) ^ t0.marital_status = 'M' ^ t0.single_exemp = '1500' -> t0._marital_status = '0'",
+        "beers(t0) ^ t0.ibu = 'N/A' -> t0._ibu = '0'",
+        "beers(t0) ^ t0.state = 'null' -> t0._state = '0'",
     ]
 
     regex_rules = [
-        r"tax(t0) ^ regular( t0.l_name , '((?!'').)*') -> true",
-        r"tax(t0) ^ regular( t0.f_name , '((?!'').)*') -> true",
-        r"tax(t0) ^ regular( t0.state , '((?!-\*).)*') -> true",
-        r"tax(t0) ^ regular( t0.city , '((?!-\*).)*') -> true",
-        r"tax(t0) ^ regular( t0.single_exemp , '\d+') -> true",
-        r"tax(t0) ^ regular( t0.child_exemp , '\d+') -> true",
+        r"beers(t0) ^ regular( t0.ounces , '\d+') -> true",
+        r"beers(t0) ^ regular( t0.abv , '[^%]+') -> true",
+        r"beers(t0) ^ regular( t0.city , '.*[^A-Z]') -> true",
     ]
 
     result = dirty_label
